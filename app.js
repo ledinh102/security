@@ -1,4 +1,4 @@
-require('dotenv').config()
+require("dotenv").config()
 const express = require("express")
 const bodyParser = require("body-parser")
 const mongoose = require("mongoose")
@@ -8,6 +8,8 @@ const app = express()
 app.use(express.static("public"))
 app.set("view engine", "ejs")
 app.use(bodyParser.urlencoded({ extended: true }))
+const bcrypt = require("bcrypt")
+const saltRounds = 10
 
 mongoose
 	.connect("mongodb://127.0.0.1:27017/usersDB")
@@ -39,14 +41,19 @@ app.get("/register", (req, res) => {
 })
 
 app.post("/register", (req, res) => {
-	const newUser = new User({
-		username: req.body.username,
-		password: req.body.password,
+	const username = req.body.username
+	const password = req.body.password
+
+	bcrypt.hash(password, saltRounds).then(function (hash) {
+		const newUser = new User({
+			username: username,
+			password: hash,
+		})
+		newUser
+			.save()
+			.then(() => res.render("secrets"))
+			.catch((error) => console.log(error))
 	})
-	newUser
-		.save()
-		.then(() => res.render("secrets"))
-		.catch((error) => console.log(error))
 })
 
 app.post("/login", (req, res) => {
@@ -55,11 +62,13 @@ app.post("/login", (req, res) => {
 
 	User.findOne({ username: username }).then((foundUser) => {
 		if (foundUser) {
-			if (foundUser.password === password) {
-				res.render("secrets")
-			} else {
-				console.log("Passwords do not match")
-			}
+			bcrypt.compare(password, foundUser.password).then(function(result) {
+				if (result) {
+					res.render("secrets")
+				} else {
+					console.log("Passwords do not match")
+				}
+			});
 		} else {
 			console.log(`Account not found`)
 		}
